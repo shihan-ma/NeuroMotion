@@ -1,0 +1,10 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+NeuroMotion/__pycache__/
+NeuroMotion/MSKlib/__pycache__/
+NeuroMotion/MNPoollib/__pycache__/
+
+figs/
+res/
+ckp/*.pth
+NeuroMotion/MSKlib/models/
