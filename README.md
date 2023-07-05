@@ -2,7 +2,7 @@
 NeuroMotion is an open-source python package for simulating surface EMG signals during voluntary hand, wrist, and forearm movements.
 
 ## Overview
-
+![Overview](https://github.com/shihan-ma/NeuroMotion/blob/master/images/schematic.png)
 NeuroMotion is comprised of three key modules, including part of the OpenSim API, BioMime, and a motor unit pool model. OpenSim is used to define and visualise movements of an upper-limb musculoskeletal model and to estimate muscle lengths and muscle activations during the movements. BioMime is an AI EMG model that takes in the nonstationary physiological parameters and outputs dynamic motor unit action potentials (MUAPs) on forearm. The motor unit pool model is used to initialise the motor unit properties within each motoneuron pool and to convert the neural drives into spike trains. For more details, see []().
 
 ## Installation
