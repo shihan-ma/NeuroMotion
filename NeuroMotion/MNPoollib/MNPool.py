@@ -7,14 +7,15 @@ import sys
 sys.path.append('.')
 
 from BioMime.utils.params import coeff_a, coeff_b
+from NeuroMotion.MNPoollib.mn_params import mn_default_settings
 
 
 class MotoneuronPool:
     def __init__(self, N, rr, rm, rp, pfr1, pfrd, mfr1, mfrd, gain, c_ipi, frs1, frsd, mode='exp'):
         """
         N       Number of motor units
-        rm      Recruitment maximum when all MUs are active
         rr      Recruitment range: largest/smallest
+        rm      Recruitment maximum when all MUs are active
         rp      Force fold: largest/smallest
         pfr1    Peak firing rate of first MU, Hz
         pfrd    Peak firing rate difference between first and last MU, Hz
@@ -271,25 +272,7 @@ if __name__ == '__main__':
 
     # Test example
     num_mu = 100
-    rr = 50
-    rm = 0.75
-    rp = 100
-    pfr1 = 35
-    pfrd = 12
-    mfr1 = 8
-    mfrd = 0
-    ge = 30         # 0.3 per % MVC
-    c_ipi = 0.1
-
-    # Settings below match iEMG package (git@github.com:smetanadvorak/iemg_simulator.git)
-    pfr1 = 40
-    pfrd = 10
-    mfr1 = 10
-    mfrd = 5
-    frs1 = 50
-    frsd = 20
-
-    mn_pool = MotoneuronPool(num_mu, rr, rm, rp, pfr1, pfrd, mfr1, mfrd, ge, c_ipi, frs1, frsd)
+    mn_pool = MotoneuronPool(num_mu, **mn_default_settings)
 
     # properties
     config = edict({
@@ -306,7 +289,7 @@ if __name__ == '__main__':
     fs = 2048           # Hz
     duration = 6        # s
     times = np.linspace(0, duration, duration * fs)
-    ext = np.linspace(0, 1.0, fs * duration)
+    ext = np.linspace(0, 0.3, fs * duration)
     # ext = np.concatenate((np.linspace(0, 0.8, round(fs * duration / 2)), np.linspace(0.8, 0, round(fs * duration / 2))))
     # ext = (np.sin(times) + 1) * 0.4
 

@@ -1,0 +1,26 @@
+# Range of each DoF
+RANGE_DOF = {
+    'deviation': [-0.175, 0.435],
+    'flexion': [-1.222, 1.221],
+    'cmc_flexion': [-45, 15],
+    'cmc_abduction': [-25, 25],
+    'mp_flexion': [-40, 45],
+    'ip_flexion': [-25, 75],
+    '4cmc_flexion': [0, 11.642],
+    '2mcp_abduction': [-15, 15],
+    '2mcp_flexion': [-45, 90],
+    '2pm_flexion': [0, 100],
+    '2md_flexion': [0, 80],
+    '3mcp_abduction': [-15, 15],
+    '3mcp_flexion': [-45, 90],
+    '3pm_flexion': [0, 100],
+    '3md_flexion': [0, 80],
+    '4mcp_abduction': [-15, 15],
+    '4mcp_flexion': [-45, 90],
+    '4pm_flexion': [0, 100],
+    '4md_flexion': [0, 80],
+    '5mcp_abduction': [-15, 15],
+    '5mcp_flexion': [-45, 90],
+    '5pm_flexion': [0, 100],
+    '5md_flexion': [0, 80]
+}

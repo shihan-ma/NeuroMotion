@@ -2,6 +2,7 @@ import argparse
 import os
 import torch
 import time
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -13,8 +14,8 @@ sys.path.append('.')
 
 from NeuroMotion.MSKlib.MSKpose import MSKModel
 from NeuroMotion.MNPoollib.MNPool import MotoneuronPool
-from NeuroMotion.MNPoollib.mn_utils import plot_spike_trains, generate_emg_mu
-from NeuroMotion.MNPoollib.mn_params import DEPTH, ANGLE, MS_AREA, NUM_MUS
+from NeuroMotion.MNPoollib.mn_utils import plot_spike_trains, generate_emg_mu, normalise_properties
+from NeuroMotion.MNPoollib.mn_params import DEPTH, ANGLE, MS_AREA, NUM_MUS, mn_default_settings
 from BioMime.models.generator import Generator
 from BioMime.utils.basics import update_config, load_generator
 from BioMime.utils.plot_functions import plot_muaps
@@ -26,6 +27,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_pth', default='./ckp/model_linear.pth', type=str, help='path of best pretrained BioMime model')
     parser.add_argument('--res_path', default='./res', type=str, help='path of result folder')
     parser.add_argument('--device', default='cuda', type=str, help='cuda|cpu')
+    parser.add_argument('--morph', action='store_true', help='morph MUAPs')
+    parser.add_argument('--muap_file', default='./ckp/muap_examples.pkl', type=str, help='initial labelled muaps')
 
     args = parser.parse_args()
     cfg = update_config('./ckp/' + args.cfg)
@@ -45,25 +48,15 @@ if __name__ == '__main__':
 
     # PART TWO: Define the MotoneuronPool of one muscle
     ms_label = 'FDSI'
-    num_mus = NUM_MUS[ms_label]
-    rr = 50
-    rm = 0.75
-    rp = 100
-    pfr1 = 35
-    pfrd = 12
-    mfr1 = 8
-    mfrd = 0
-    ge = 30         # 0.3 per % MVC
-    c_ipi = 0.1
 
-    pfr1 = 40
-    pfrd = 10
-    mfr1 = 10
-    mfrd = 5
-    frs1 = 50
-    frsd = 20
+    if args.morph:
+        with open(args.muap_file, 'rb') as fl:
+            db = pickle.load(fl)
+        num_mus = len(db['iz'])
+    else:
+        num_mus = NUM_MUS[ms_label]
 
-    mn_pool = MotoneuronPool(num_mus, rr, rm, rp, pfr1, pfrd, mfr1, mfrd, ge, c_ipi, frs1, frsd)
+    mn_pool = MotoneuronPool(num_mus, **mn_default_settings)
     # Assign physiological properties
     fibre_density = 200     # 200 fibres per mm^2
     num_fb = np.round(MS_AREA[ms_label] * fibre_density)    # total number within one muscle
@@ -76,13 +69,16 @@ if __name__ == '__main__':
         'cv': [4, 0.3]      # Recommend not setting std too large. cv range in training dataset is [3, 4.5]
     })
 
-    properties = mn_pool.assign_properties(config, normalise=True)
-    num = torch.from_numpy(properties['num']).reshape(num_mus, 1).repeat(1, steps)
-    depth = torch.from_numpy(properties['depth']).reshape(num_mus, 1).repeat(1, steps)
-    angle = torch.from_numpy(properties['angle']).reshape(num_mus, 1).repeat(1, steps)
-    iz = torch.from_numpy(properties['iz']).reshape(num_mus, 1).repeat(1, steps)
-    cv = torch.from_numpy(properties['cv']).reshape(num_mus, 1).repeat(1, steps)
-    length = torch.from_numpy(properties['len']).reshape(num_mus, 1).repeat(1, steps)
+    if args.morph:
+        num, depth, angle, iz, cv, length, base_muaps = normalise_properties(db, num_mus, steps)
+    else:
+        properties = mn_pool.assign_properties(config, normalise=True)
+        num = torch.from_numpy(properties['num']).reshape(num_mus, 1).repeat(1, steps)
+        depth = torch.from_numpy(properties['depth']).reshape(num_mus, 1).repeat(1, steps)
+        angle = torch.from_numpy(properties['angle']).reshape(num_mus, 1).repeat(1, steps)
+        iz = torch.from_numpy(properties['iz']).reshape(num_mus, 1).repeat(1, steps)
+        cv = torch.from_numpy(properties['cv']).reshape(num_mus, 1).repeat(1, steps)
+        length = torch.from_numpy(properties['len']).reshape(num_mus, 1).repeat(1, steps)
 
     fs = 2048
     mn_pool.init_twitches(fs)
@@ -138,12 +134,22 @@ if __name__ == '__main__':
             cv[:, sp] * ch_cv.iloc[sp, :].values,
             length[:, sp] * ch_len.iloc[sp, :].values,
         )).transpose(1, 0)
-        zi = torch.randn(num_mus, cfg.Model.Generator.Latent)
+
+        if not args.morph:
+            zi = torch.randn(num_mus, cfg.Model.Generator.Latent)
+            if args.device == 'cuda':
+                zi = zi.cuda()
+        else:
+            if args.device == 'cuda':
+                base_muaps = base_muaps.cuda()
 
         if args.device == 'cuda':
-            cond, zi = cond.cuda(), zi.cuda()
+            cond = cond.cuda()
 
-        sim = generator.sample(num_mus, cond.float(), cond.device, zi)
+        if args.morph:
+            sim = generator.generate(base_muaps, cond.float())
+        else:
+            sim = generator.sample(num_mus, cond.float(), cond.device, zi)
 
         if args.device == 'cuda':
             sim = sim.permute(0, 2, 3, 1).cpu().detach().numpy()

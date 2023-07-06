@@ -4,6 +4,8 @@ import pandas as pd
 import opensim as osim
 from tqdm import tqdm
 
+from NeuroMotion.MSKlib.pose_params import RANGE_DOF
+
 
 class MSKModel:
     def __init__(self, model_path='/home/msh/git/NeuroMotion/NeuroMotion/MSKlib/models/ARMS_Wrist_Hand_Model_4.3.2', model_name='Tenodesis_Model_moreDoF.osim', default_pose_path='/home/msh/git/NeuroMotion/NeuroMotion/MSKlib/models/poses.csv'):
@@ -19,20 +21,28 @@ class MSKModel:
         for ms in self.model.getMuscles():
             self.all_ms_labels.append(ms.getName())
 
-        # TODO: use opensim api to find the range of each DoFs
-
     def _init_pose(self, pose_path):
         self.pose_basis = pd.read_csv(pose_path)
 
     def _check_range(self):
-        pass
+        if len(self.mov) > 0:
+            for k, v in RANGE_DOF.items():
+                if k in self.mov.keys():
+                    if k == 'deviation' or k == 'flexion':
+                        dof = self.mov[k] * np.pi / 180
+                    else:
+                        dof = self.mov[k]
+                    assert np.all(dof >= v[0]) and np.all(dof <= v[1]), 'DoF ' + k + ' out of range!'
+        else:
+            print('mov has not been initialised!')
 
     def load_mov(self, file_path):
         # TODO
-        pass
+        self._check_range()
 
     def update_mov(self, mov):
         self.mov = mov
+        self._check_range()
 
     def sim_mov(self, fs, poses, durations):
         """
@@ -68,6 +78,7 @@ class MSKModel:
         mov = pd.DataFrame(data=mov, columns=['time', *self.pose_basis.iloc[:, 0].tolist()])
 
         self.mov = mov
+        self._check_range()
 
         return mov
 
