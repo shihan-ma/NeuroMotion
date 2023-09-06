@@ -1,3 +1,6 @@
+import numpy as np
+
+
 # Range of MU depth and MU angle within each muscle
 DEPTH = {
     'ECRB': [0.0130, 0.0220],
@@ -60,4 +63,30 @@ mn_default_settings = {
     'c_ipi': 0.1,
     'frs1': 50,
     'frsd': 20,
+}
+
+# Settings for AC's motoneuron pool model
+FCU_total_size = MS_AREA['FCU_u'] + MS_AREA['FCU_h']
+
+PCSA = np.array([252.5, 337.3, 101, 479.8 * MS_AREA['FCU_u']/FCU_total_size, 479.8 * MS_AREA['FCU_h'] / FCU_total_size, 192.9, 39.40 + 109.2 + 94.4 + 48.8 + 72.4, 162.5]) / 50.8  # max iso forces from the MSK model / specific tension of 50.8N/cm2.
+
+# correction coeff from cadeveric results for FDI
+nb_fibres_cadaveric = 40500
+PCSA_FDI = 60.7 / 50.8  # of the FDI from MSK values
+nb_estimated = (PCSA_FDI / (np.pi * (26 * 10**-4)**2 / 4))
+correction_factor = nb_fibres_cadaveric / nb_estimated
+
+avg_fibre_diam = 34 * 10**-4  # 34 micrometers, scaled in centimeters, taken from cadaveric literature. Fuglevand uses 46um. 
+avg_fibre_CSA = np.pi * avg_fibre_diam**2 / 4  # gives a density of 86 fibres /mm2. Fuglevand uses 20.
+nb_fibres_per_muscle = (PCSA / avg_fibre_CSA).astype(int)  # gives between 170k and 600k fibres within the muscles, which is quite conservative. 
+nb_fibres_per_muscle = (nb_fibres_per_muscle * correction_factor).astype(int) # Now 40k-140k fibres per muscle, sounds good
+NUM_FIBRES_MS = {
+    'ECRB': nb_fibres_per_muscle[0],
+    'ECRL': nb_fibres_per_muscle[1],
+    'PL': nb_fibres_per_muscle[2],
+    'FCU_u': nb_fibres_per_muscle[3],
+    'FCU_h': nb_fibres_per_muscle[4],
+    'ECU': nb_fibres_per_muscle[5],
+    'EDI': nb_fibres_per_muscle[6],
+    'FDSI': nb_fibres_per_muscle[7],
 }
