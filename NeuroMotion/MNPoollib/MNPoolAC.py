@@ -69,7 +69,7 @@ class MotoneuronPoolAC:
         angle = np.random.rand(self.N) * (config.angle[1] - config.angle[0]) + config.angle[0]      # Uniform distribution
         iz = np.random.randn(self.N) * config.iz[1] + config.iz[0]              # Normal distribution
         len = np.random.randn(self.N) * config.len[1] + config.len[0]           # Normal distribution
-        cv = np.sort(np.random.randn(self.N) * config.cv[1] + config.cv[0])     # Normal distribution
+        cv = 1.5 * 10e4 * self.MN_size_array**0.69
 
         mn = {
             'num': self._normalise(normalise, np.log(num), *nrange, label='num'),
