@@ -36,8 +36,23 @@ class MSKModel:
         else:
             print('mov has not been initialised!')
 
-    def load_mov(self, file_path):
-        # TODO
+    def load_mov(self, angles):
+        """
+        angles: np.array or dataframe of the joint angles
+        Requires: 
+        if angles is np.array, the first column of angles should be the time in seconds. The second to the 25th columns are the angles of the 24 DoFs, in the same sequence with pose_basis
+        if angles is pd.dataframe, the columns should be 'time' and the DoFs in pose_basis
+        """
+        num_columns = len(self.pose_basis) + 1
+        if isinstance(angles, np.ndarray):
+            assert angles.shape[1] == num_columns, f'input angle with {angles.shape[1]} columns, required {num_columns} columns'
+            self.mov = pd.DataFrame(data=angles, columns=['time', *self.pose_basis.iloc[:, 0].tolist()])
+        elif isinstance(angles, pd.DataFrame):
+            assert len(angles.columns) == num_columns, f'input angle with {len(angles.columns)} columns, required {num_columns} columns'
+            self.mov = angles
+        else:
+            raise NotImplementedError('Not implemented angle type. Should be np.array or pd.dataframe.')
+
         self._check_range()
 
     def update_mov(self, mov):
@@ -57,6 +72,7 @@ class MSKModel:
 
         # Get pd of time and joints
         mov = []
+        total_time_dim = 0
         for i in range(num_pose - 1):
             time_dim = int(durations[i] * fs)
 
@@ -71,9 +87,9 @@ class MSKModel:
                 nxt_ang += self.pose_basis.loc[:, p]
 
             mov.append(np.linspace(cur_ang, nxt_ang, num=time_dim))
+            total_time_dim = total_time_dim + time_dim
         mov = np.concatenate(mov)
-        time_dim = int(np.sum(durations) * fs)
-        time = np.linspace(0, np.sum(durations), num=time_dim)
+        time = np.linspace(0, np.sum(durations), num=total_time_dim)
         mov = np.concatenate((time[:, None], mov), axis=1)
         mov = pd.DataFrame(data=mov, columns=['time', *self.pose_basis.iloc[:, 0].tolist()])
 
@@ -149,6 +165,7 @@ class MSKModel:
             'depth': depths,
             'cv': cvs,
             'len': self.ms_lens,
+            'steps': len(depths),
         }
         self.param_changes = param_changes
 

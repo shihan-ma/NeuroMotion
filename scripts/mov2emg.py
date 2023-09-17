@@ -35,16 +35,24 @@ if __name__ == '__main__':
 
     # PART ONE: Define MSK model, movements, and extract param changes
     msk = MSKModel()
-    poses = ['default', 'default+flex', 'default', 'default+ext', 'default']
-    durations = [2] * 4
-    duration = np.sum(durations)
-    fs_mov = 5
-    steps = fs_mov * duration
-    ms_labels = ['ECRB', 'ECRL', 'PL', 'FCU', 'ECU', 'EDCI', 'FDSI']
+    # poses = ['default', 'default+flex', 'default', 'default+ext', 'default']
+    # durations = [1.5] * 4
+    # duration = np.sum(durations)
+    # fs_mov = 5
+    # msk.sim_mov(fs_mov, poses, durations)
 
-    msk.sim_mov(fs_mov, poses, durations)
+    # Load joint angles from file
+    file_path = './data/joint_angle.pkl'
+    with open(file_path, 'rb') as file:
+        joint_angles = pickle.load(file)        # pd.dataframe or np.array
+    duration = 10       # seconds
+    fs_mov = 5
+    msk.load_mov(joint_angles)
+
+    ms_labels = ['ECRB', 'ECRL', 'PL', 'FCU', 'ECU', 'EDCI', 'FDSI']
     ms_lens = msk.mov2len(ms_labels=ms_labels)
     changes = msk.len2params()
+    steps = changes['steps']
 
     # PART TWO: Define the MotoneuronPool of one muscle
     ms_label = 'FDSI'
@@ -83,8 +91,8 @@ if __name__ == '__main__':
     fs = 2048
     mn_pool.init_twitches(fs)
     mn_pool.init_quisistatic_ef_model()
-    time_samples = fs * duration
-    ext = np.concatenate((np.linspace(0, 0.8, round(time_samples / 2)), np.linspace(0.8, 0, round(time_samples / 2))))      # percentage MVC
+    ext = np.concatenate((np.linspace(0, 0.8, round(fs * duration / 2)), np.linspace(0.8, 0, round(fs * duration / 2))))      # percentage MVC
+    time_samples = len(ext)
     ext_new, spikes, fr, ipis = mn_pool.generate_spike_trains(ext, fit=False)
     plot_spike_trains(spikes, './figs/spikes_{}.jpg'.format(ms_label))
 
