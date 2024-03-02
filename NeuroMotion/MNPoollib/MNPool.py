@@ -258,6 +258,40 @@ class MotoneuronPool:
 
         return mn
 
+    def display_onion_skin_theory(self, spikes, duration, fs, pth):
+
+        # from spikes to n_spike_trains
+        n_spike_trains = np.zeros((self.N, int(duration * fs)))
+        firing_times_sim = []
+        for i in range(self.N):
+            if len(spikes[i]) > 0:
+                firing_times_sim.append(np.array(spikes[i]) / fs)
+                for j in spikes[i]:
+                    n_spike_trains[i, j] = 1
+
+        idf = np.empty((self.N,), dtype=object) 
+        for i in range(len(firing_times_sim)):
+            if len(firing_times_sim[i]) - 1 < 2:
+                break
+            else:
+                idf[i] = 1 / np.diff(firing_times_sim[i])
+        idf = idf[0 : i]
+
+        smoothed_IDF_sim_sec = np.empty((len(idf),), dtype=object)
+        time_list = np.arange(0, duration, 1 / fs)
+        for i in range(len(idf)):    
+            smoothed_IDF_sim_sec[i] = np.poly1d(np.polyfit(time_list[n_spike_trains[i] > 0][0 : -1].astype(float), idf[i].astype(float), 6))(time_list[n_spike_trains[i] > 0][0 : -1].astype(float))
+            if i % 5 == 0:
+                plt.plot(time_list[n_spike_trains[i] > 0][0 : -1], smoothed_IDF_sim_sec[i], color=(i / len(idf), 0.4, (len(idf) - i) / len(idf)))  # c=colors[i])
+        plt.xlim(0, duration)
+        plt.xlabel('Time (s)', fontsize=14)
+        plt.ylabel('Filtered discharge frequencies (Hz)', fontsize=14)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        # plt.title('Onion Skin theory - Simulated N MNs')
+        plt.savefig(pth)
+        plt.close()
+
     def _normalise(self, normalise, vals, low, high, local=False, label=None):
         if not normalise:
             return vals
@@ -271,7 +305,7 @@ class MotoneuronPool:
 if __name__ == '__main__':
 
     # Test example
-    num_mu = 100
+    num_mu = 186
     mn_pool = MotoneuronPool(num_mu, **mn_default_settings)
 
     # properties
@@ -293,6 +327,13 @@ if __name__ == '__main__':
     # ext = np.concatenate((np.linspace(0, 0.8, round(fs * duration / 2)), np.linspace(0.8, 0, round(fs * duration / 2))))
     # ext = (np.sin(times) + 1) * 0.4
 
+    # start = 1
+    # ramp = 1
+    # ext = np.concatenate((np.zeros(start * fs), np.arange(0, ramp, 1 / fs) / ramp * 0.3, np.ones(int((duration // 2 - start - ramp) * fs))))
+    # ext = np.concatenate((ext, ext[::-1]))
+
+    # ext = np.ones(duration * fs) * 0.3
+
     # Force and Twitches
     mn_pool.init_twitches(fs)
     mn_pool.init_quisistatic_ef_model()
@@ -303,7 +344,6 @@ if __name__ == '__main__':
     for sp in spikes:
         if len(sp) > 0:
             active_mu += 1
-    print('number of active mu: ', active_mu)
 
     # Visualisation
     # plot spikes
@@ -314,15 +354,20 @@ if __name__ == '__main__':
         spike = spikes[mu]
         plt.vlines(spike, mu, mu + 0.5, linewidth=1.0)
     ax.set_xticks(range(0, duration * fs + 1, 2*fs), labels=['0', '2', '4', '6'])
-    ax.set_ylabel('Discharge Patterns (MU index)')
-    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Discharge Patterns (MU index)', fontsize=14)
+    ax.set_xlabel('Time (s)', fontsize=14)
+    ax.xaxis.set_tick_params(labelsize=11)
+    ax.yaxis.set_tick_params(labelsize=11)
 
     ax2 = ax.twinx()
-    ax2.plot(np.array([0, 6]) * 2048, np.array([0, 1]), linewidth=4, c='#003366', alpha=0.3)
+    ax2.plot(times * fs, ext, linewidth=4, c='#003366', alpha=0.3)
     ax2.tick_params(axis='y')
-    ax2.set_ylabel('Input drive')
+    ax2.set_ylabel('Neural input', fontsize=14)
     ax2.set_yticks([0, 1], labels=['0.0', '1.0'])
-    plt.savefig('./figs/spikes.jpg')
+    ax2.xaxis.set_tick_params(labelsize=11)
+    ax2.yaxis.set_tick_params(labelsize=11)
+    plt.tight_layout()
+    plt.savefig('./figs/spikes_ramp.svg')
     plt.close()
 
     # plot fr
@@ -333,10 +378,12 @@ if __name__ == '__main__':
 
     fig = plt.figure()
     ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-    for mu in range(num_mu):
-        plt.plot(fr[mu], c=my_colors[mu])
+    for i in range(0, num_mu, 5):
+        plt.plot(fr[i], color=(i / num_mu, 0.4, (num_mu - i) / num_mu))
     ax.set_xticks(range(0, duration * fs + 1, 2*fs), labels=['0', '2', '4', '6'])
     ax.set_ylabel('Firing Rate (Hz)')
     ax.set_xlabel('Time (s)')
-    plt.savefig('./figs/fr.jpg')
+    plt.savefig('./figs/fr_ramp.jpg')
     plt.close()
+
+    mn_pool.display_onion_skin_theory(spikes, duration, fs, './figs/onion_skin_ramp.svg')

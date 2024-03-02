@@ -93,15 +93,14 @@ class MotoneuronPoolAC:
             assert label is not None
             return (vals + coeff_a[label]) * coeff_b[label]
 
-    def get_spike_train(self, act, fs, t_stop):
+    def get_spike_train(self, ext, step_size, duration):
         """
-        act: normalised synaptic input [0, 1]
+        ext: normalised synaptic input [0, 1]
         """
-        step_size = 1 / 2 / fs
-        self.time_list = np.arange(0, t_stop, step_size)
+        self.time_list = np.arange(0, duration, step_size)
 
         def I(t):
-            return self.I1 + (self.I2 - self.I1) * act[int(t / step_size)]
+            return self.I1 + (self.I2 - self.I1) * ext[int(t / step_size)]
 
         self.I_list = [I(self.time_list[i]) for i in range (len(self.time_list))]
 
@@ -123,8 +122,8 @@ class MotoneuronPoolAC:
             firing_samples[i] = cur_samples
         return n_sp, firing_samples
 
-    def get_binary_spikes(self, act, fs, t_stop):
-        firing_times_sim, step_size = self.get_spike_train(act, fs, t_stop)
+    def get_binary_spikes(self, ext, step_size, duration):
+        firing_times_sim, step_size = self.get_spike_train(ext, step_size, duration)
         n_spike_trains, firing_samples = self.firing_times_to_spike_trains(firing_times_sim, step_size)
         cst = np.sum(n_spike_trains, 0)
         return n_spike_trains, firing_samples, cst, firing_times_sim
@@ -188,20 +187,20 @@ class MotoneuronPoolAC:
         plt.savefig(f'{pth}/time_constant.jpg')
         plt.close()
 
-    def plot_neural_drive(self, fs, act, cst, pth):
+    def plot_neural_drive(self, fs, ext, cst, pth):
         # Neural drive (filtered CST) obtained from the virtual pool of N firing MNs
         hanning_window = signal.windows.hann(int(0.4 * fs))  # np.hanning(L)
         sum_Han = sum(hanning_window)    
         neural_drive= signal.convolve(cst, hanning_window, mode='same') / sum_Han
         plt.plot(self.time_list, neural_drive, label='Neural Drive')
-        plt.plot(self.time_list, act, label='Normalized Input')
+        plt.plot(self.time_list, ext, label='Normalized Input')
         plt.xlabel('Time (s)')
         plt.ylabel('Neural drive / Normalized Input')
         plt.legend()
         plt.savefig(f'{pth}/neural_drive.jpg')
         plt.close()
 
-    def display_onion_skin_theory(self, firing_times_sim, n_spike_trains, t_stop, pth):
+    def display_onion_skin_theory(self, firing_times_sim, n_spike_trains, duration, pth):
         # First compute the series of instantaneous discharge rates for the firing MNs
         idf = np.empty((self.N,), dtype=object) 
         for i in range(self.N):
@@ -216,12 +215,14 @@ class MotoneuronPoolAC:
             smoothed_IDF_sim_sec[i] = np.poly1d(np.polyfit(self.time_list[n_spike_trains[i] > 0][0 : -1].astype(float), idf[i].astype(float), 6))(self.time_list[n_spike_trains[i] > 0][0 : -1].astype(float))
             if i % 5 == 0:
                 plt.plot(self.time_list[n_spike_trains[i] > 0][0 : -1], smoothed_IDF_sim_sec[i], color=(i / len(idf), 0.4, (len(idf) - i) / len(idf)))  # c=colors[i])
-        plt.xlim(0, t_stop)
+        plt.xlim(0, duration)
         plt.ylim(0, np.max(1 / self.ARP_array) * 1.1)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Filtered discharge frequencies (Hz)')
-        plt.title('Onion Skin theory - Simulated N MNs')
-        plt.savefig(f'{pth}/onion_skin.jpg')
+        plt.xlabel('Time (s)', fontsize=14)
+        plt.ylabel('Filtered discharge frequencies (Hz)', fontsize=14)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        # plt.title('Onion Skin theory - Simulated N MNs')
+        plt.savefig(pth)
         plt.close()
 
 
@@ -232,11 +233,43 @@ if __name__ == '__main__':
     ms_label = 'ECRB'
     mn_pool = MotoneuronPoolAC(num_mu, ms_label)
 
-    fs = 2048
-    t_stop = 10
-    act = np.arange(0, t_stop, 1 / 2 / fs) / t_stop * 0.6
-    n_spike_trains, firing_samples, cst, firing_times_sim = mn_pool.get_binary_spikes(act, fs, t_stop)
-    # firing_times_sim, step_size = mn_pool.get_spike_train(act, fs, t_stop)
+    fs = 2048           # Hz
+    duration = 6        # s
+    times = np.linspace(0, duration, duration * fs)
+    step_size = 1 / fs
+    # ext = np.arange(0, duration, step_size) / duration * 0.3
+    # start = 1
+    # ramp = 1
+    # ext = np.concatenate((np.zeros(start * fs), np.arange(0, ramp, 1 / fs) / ramp * 0.3, np.ones(int((duration // 2 - start - ramp) * fs))))
+    # ext = np.concatenate((ext, ext[::-1]))
+    ext = np.ones(duration * fs) * 0.3
+
+    n_spike_trains, firing_samples, cst, firing_times_sim = mn_pool.get_binary_spikes(ext, step_size, duration)
+
+    mn_pool.display_onion_skin_theory(firing_times_sim, n_spike_trains, duration, './figs/onion_skin_ac_constant.svg')
+
+    # Visualisation
+    # plot spikes
+    fig = plt.figure()
+    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    for mu in range(num_mu):
+        spike = np.nonzero(n_spike_trains[mu])[0]
+        plt.vlines(spike, mu, mu + 0.5, linewidth=1.0)
+    ax.set_xticks(range(0, duration * fs + 1, 2*fs), labels=['0', '2', '4', '6'])
+    ax.set_ylabel('Discharge Patterns (MU index)', fontsize=14)
+    ax.set_xlabel('Time (s)', fontsize=14)
+    ax.xaxis.set_tick_params(labelsize=11)
+    ax.yaxis.set_tick_params(labelsize=11)
+
+    ax2 = ax.twinx()
+    ax2.plot(times * fs, ext, linewidth=4, c='#003366', alpha=0.3)
+    ax2.tick_params(axis='y')
+    ax2.set_ylabel('Neural input', fontsize=14)
+    ax2.set_yticks([0, 1], labels=['0.0', '1.0'])
+    ax2.xaxis.set_tick_params(labelsize=11)
+    ax2.yaxis.set_tick_params(labelsize=11)
+    plt.savefig('./figs/spikes_ac_constant.svg')
+    plt.close()
 
     config = edict({
         'depth': DEPTH[ms_label],
@@ -246,4 +279,4 @@ if __name__ == '__main__':
         'cv': [4, 0.3]      # Recommend not setting std too large. cv range in training dataset is [3, 4.5]
     })
     properties = mn_pool.assign_properties(config)
-    print(properties)
+    # print(properties)
