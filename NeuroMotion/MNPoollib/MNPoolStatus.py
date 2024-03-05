@@ -114,11 +114,11 @@ class MotoneuronPoolStatus:
         fr[E < self.rte] = 0
         return fr
 
-    def generate_current_spikes(self, activation, step):
+    def generate_current_spikes(self, activation, fs, dt):
         """
         Args:
             activation  excitation in percentage MVC, (1, 1)
-            step        observation interval, e.g., 0.1s
+            dt        observation interval, e.g., 0.1s
         Return:
             spikes  binary array, (N, 1)
 
@@ -140,18 +140,19 @@ class MotoneuronPoolStatus:
                 if self.next_spiking[mu] <= 0 or self.next_spiking[mu] == np.iinfo(np.int32).max:
                     # has already fired or not been activated
                     # print(f"mu {mu}, next spiking {self.next_spiking[mu]}")
-                    ipi = 1 / step / self.fr[mu]
+                    ipi = 1 / dt / self.fr[mu]
                     ipi = ipi + np.random.randn() * ipi * 1 / 6
                     self.next_spiking[mu] = int(ipi)
-                    # print(f"ipi {ipi}, step {step}, fr, {self.fr[mu]}, self.next_spiking {self.next_spiking[mu]}")
+                    # print(f"ipi {ipi}, dt {dt}, fr, {self.fr[mu]}, self.next_spiking {self.next_spiking[mu]}")
                     # assert 1 == 2
                 else:
                     # activated but not fired yet
-                    if prev_fr[mu] <= 0:
-                        coeff = 1
-                    else:
-                        coeff = self.fr[mu] / prev_fr[mu]
-                    self.next_spiking[mu] = int(self.next_spiking[mu] - 1 / step * step * coeff)
+                    # if prev_fr[mu] <= 0:
+                    #     coeff = 1
+                    # else:
+                    #     coeff = self.fr[mu] / prev_fr[mu]
+                    coeff = 1.0
+                    self.next_spiking[mu] = int(self.next_spiking[mu] - 1 / (1 / fs) * dt * coeff)
         return current_spikes
 
     # Properties

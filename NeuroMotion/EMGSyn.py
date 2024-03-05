@@ -101,15 +101,15 @@ class EMGSynthesiser:
         for k, v in mnpool_kwargs.items():
             self.muap_latent[k] = torch.randn(v["N"], biomime_cfg.Model.Generator.Latent)
 
-    def update_emg(self, muscle_lengths, activations, step=None):
+    def update_emg(self, muscle_lengths, activations, dt=None):
         muaps = self.generate_muap(muscle_lengths)
-        spikes = self.generate_spikes(activations, step)
+        spikes = self.generate_spikes(activations, dt)
         emg = self.generate_emg(muaps, spikes)
 
-        if step is None:
-            step = 1 / self.fs
-        shift = int(step * self.fs)
-        self.emg[:, :, :-shift] = self.emg[:, :, shift:]
+        if dt is None:
+            dt = 1 / self.fs
+        n_steps = int(dt * self.fs)
+        self.emg[:, :, :-n_steps] = self.emg[:, :, n_steps:]
         self.emg[:, :, -96:] = self.emg[:, :, -96:] + emg
 
         cur_emg = self.emg[:, :, -96].copy()
@@ -149,12 +149,12 @@ class EMGSynthesiser:
 
         return muaps
 
-    def generate_spikes(self, activations, step=None):
+    def generate_spikes(self, activations, dt=None):
         spikes = {}
-        if step is None:
-            step = 1 / self.fs
+        if dt is None:
+            dt = 1 / self.fs
         for ms, pool in self.mn_pool.items():
-            current_spikes = pool.generate_current_spikes(activations[ms], step)
+            current_spikes = pool.generate_current_spikes(activations[ms], self.fs, dt)
             spikes[ms] = current_spikes
 
         self.current_spikes = spikes
@@ -164,9 +164,7 @@ class EMGSynthesiser:
     def generate_emg(self, muaps, spike_trains):
         emg = np.zeros((10, 32, 96))
         for muap, spike in zip(muaps.values(), spike_trains.values()):
-            spike = np.expand_dims(spike, -1)
-            spike = np.expand_dims(spike, -1)
-            current_emg = spike * muap
+            current_emg = spike[..., None, None] * muap
             emg = emg + current_emg.sum(0)
         return emg
 
@@ -224,7 +222,7 @@ if __name__ == "__main__":
         if i % 100 == 0:
             print(f"{active_mu} MUs activated at step {i}.")
 
-    full_emg = np.stack(emg_synthesiser.full_emg)
+    # full_emg = np.stack(emg_synthesiser.full_emg)
 
-    res_pth = "./figs"
-    plot_emg(full_emg[:, 6, 10:30:2], res_pth, suffix="ECRB")
+    # res_pth = "./figs"
+    # plot_emg(full_emg[:, 6, 10:30:2], res_pth, suffix="ECRB")
