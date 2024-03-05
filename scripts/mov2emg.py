@@ -35,19 +35,19 @@ if __name__ == '__main__':
 
     # PART ONE: Define MSK model, movements, and extract param changes
     msk = MSKModel()
-    # poses = ['default', 'default+flex', 'default', 'default+ext', 'default']
-    # durations = [1.5] * 4
-    # duration = np.sum(durations)
-    # fs_mov = 5
-    # msk.sim_mov(fs_mov, poses, durations)
-
-    # Load joint angles from file
-    file_path = './data/joint_angle.pkl'
-    with open(file_path, 'rb') as file:
-        joint_angles = pickle.load(file)        # pd.dataframe or np.array
-    duration = 10       # seconds
+    poses = ['default', 'default+flex', 'default', 'default+ext', 'default']
+    durations = [1.5] * 4
+    duration = np.sum(durations)
     fs_mov = 5
-    msk.load_mov(joint_angles)
+    msk.sim_mov(fs_mov, poses, durations)
+
+    # # Load joint angles from file
+    # file_path = './data/joint_angle.pkl'
+    # with open(file_path, 'rb') as file:
+    #     joint_angles = pickle.load(file)        # pd.dataframe or np.array
+    # duration = 10       # seconds
+    # fs_mov = 5
+    # msk.load_mov(joint_angles)
 
     ms_labels = ['ECRB', 'ECRL', 'PL', 'FCU', 'ECU', 'EDCI', 'FDSI']
     ms_lens = msk.mov2len(ms_labels=ms_labels)
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     else:
         num_mus = NUM_MUS[ms_label]
 
-    mn_pool = MotoneuronPool(num_mus, **mn_default_settings)
+    mn_pool = MotoneuronPool(num_mus, ms_label, **mn_default_settings)
     # Assign physiological properties
     fibre_density = 200     # 200 fibres per mm^2
     num_fb = np.round(MS_AREA[ms_label] * fibre_density)    # total number within one muscle

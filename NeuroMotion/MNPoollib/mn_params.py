@@ -63,6 +63,7 @@ mn_default_settings = {
     'c_ipi': 0.1,
     'frs1': 50,
     'frsd': 20,
+    'fibre_density': 200,
 }
 
 # Settings for AC's motoneuron pool model
