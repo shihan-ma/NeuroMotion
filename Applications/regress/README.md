@@ -1,4 +1,5 @@
 ## Preliminary case study of data augmentation
+Raw EMG data and joint angles can be downloaded from [link](https://drive.google.com/drive/folders/19aqHpf-xAG7kXliMTl4FP3FeRIknGOun?usp=sharing).
 1. Export mov.csv from angle.mat files and save (raw) EMG data as muscle activations
 ```bash
 python mat2mov.py sub_id
@@ -23,7 +24,7 @@ with open(os.path.join(cur_pth, 'changes.pkl'), 'wb') as file:
 ```
 
 3. Simulate EMG signals given changes of parameters
-Download the default [motor unit pools]() and put the files under `./Applications/regress/mn_pool`.
+Download the default [motor unit pools](https://drive.google.com/drive/folders/19aqHpf-xAG7kXliMTl4FP3FeRIknGOun?usp=sharing) and put the files under `./Applications/regress/mn_pool`.
 ```bash
 python Applications/regress/sim_emg.py --model_pth=./ckp/model_linear.pth --subject_id 1 --num_trials 1 --mov_type flex_ext
 ```
