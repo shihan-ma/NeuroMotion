@@ -7,13 +7,14 @@ import sys
 sys.path.append('.')
 
 from BioMime.utils.params import coeff_a, coeff_b
-from NeuroMotion.MNPoollib.mn_params import mn_default_settings
+from NeuroMotion.MNPoollib.mn_params import DEPTH, ANGLE, MS_AREA, NUM_MUS, mn_default_settings
 
 
 class MotoneuronPool:
-    def __init__(self, N, rr, rm, rp, pfr1, pfrd, mfr1, mfrd, gain, c_ipi, frs1, frsd, mode='exp'):
+    def __init__(self, N, ms_name, rr, rm, rp, pfr1, pfrd, mfr1, mfrd, gain, c_ipi, frs1, frsd, mode='exp', fibre_density=200, **kwargs):
         """
         N       Number of motor units
+        ms_name name of muscle
         rr      Recruitment range: largest/smallest
         rm      Recruitment maximum when all MUs are active
         rp      Force fold: largest/smallest
@@ -26,12 +27,14 @@ class MotoneuronPool:
         frs1    Slope of drive-firing rate of first MU
         frsd    Difference of slope of drive-firing rate between the first MU and the last MU
         mode    Linear or exp when generating min/max/slope of fr among MUs
+        fibre density   density of muscle fibres
 
         Note that if frsd is not equal to 0, slope varies among MUs. 
         mode - linear uses gain v.s. mode - exp uses [frs1, frsd] are two ways to calculate fr given ext.
         """
 
         self.N = N
+        self.ms_name = ms_name
         self.rm = rm
         self.rr = rr
         self.rp = rp
@@ -41,6 +44,7 @@ class MotoneuronPool:
         self.c_ipi = c_ipi
         self.frs = [frs1, frsd]
         self.fr_mode = mode
+        self.fibre_density = fibre_density
         self.properties = None
 
         self._init_pool()
@@ -55,6 +59,18 @@ class MotoneuronPool:
     def _init_pool(self, mode='ls2n'):
         self._init_recruitment_threshold(mode)
         self._init_frs(mode)
+        self._init_phys_params()
+
+    def _init_phys_params(self):
+        num_fb = np.round(MS_AREA[self.ms_name] * self.fibre_density)
+        self.phys_params = edict({
+            'num_fb': num_fb,
+            'depth': DEPTH[self.ms_name],
+            'angle': ANGLE[self.ms_name],
+            'iz': [0.5, 0.1],
+            'len': [1.0, 0.05],
+            'cv': [4, 0.3],
+        })
 
     def _init_recruitment_threshold(self, mode):
         if mode == 'ls2n':
@@ -225,7 +241,7 @@ class MotoneuronPool:
         self.coeff_e2f = np.polyfit(qsi_E, qsi_force, 5)
 
     # Properties
-    def assign_properties(self, config, normalise=True, nrange=[0.5, 1.0]):
+    def assign_properties(self, config=None, normalise=True, nrange=[0.5, 1.0]):
         """
         keys and vals in config:
         num     number of fibres or innervation ratio, for simplicity proportional to max twitch
@@ -235,6 +251,9 @@ class MotoneuronPool:
         len     fibre length, mean and std
         cv      conduction velocity, mean and std
         """
+
+        if config is None:
+            config = self.phys_params
 
         num = config.num_fb
         P = np.exp(np.log(self.rp) / self.N * np.arange(1, self.N + 1))
@@ -306,7 +325,8 @@ if __name__ == '__main__':
 
     # Test example
     num_mu = 186
-    mn_pool = MotoneuronPool(num_mu, **mn_default_settings)
+    muscle = "ECRL"
+    mn_pool = MotoneuronPool(num_mu, muscle, **mn_default_settings)
 
     # properties
     config = edict({
@@ -345,45 +365,45 @@ if __name__ == '__main__':
         if len(sp) > 0:
             active_mu += 1
 
-    # Visualisation
-    # plot spikes
-    fig = plt.figure()
-    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-    num_mu = len(spikes)
-    for mu in range(num_mu):
-        spike = spikes[mu]
-        plt.vlines(spike, mu, mu + 0.5, linewidth=1.0)
-    ax.set_xticks(range(0, duration * fs + 1, 2*fs), labels=['0', '2', '4', '6'])
-    ax.set_ylabel('Discharge Patterns (MU index)', fontsize=14)
-    ax.set_xlabel('Time (s)', fontsize=14)
-    ax.xaxis.set_tick_params(labelsize=11)
-    ax.yaxis.set_tick_params(labelsize=11)
+    # # Visualisation
+    # # plot spikes
+    # fig = plt.figure()
+    # ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    # num_mu = len(spikes)
+    # for mu in range(num_mu):
+    #     spike = spikes[mu]
+    #     plt.vlines(spike, mu, mu + 0.5, linewidth=1.0)
+    # ax.set_xticks(range(0, duration * fs + 1, 2*fs), labels=['0', '2', '4', '6'])
+    # ax.set_ylabel('Discharge Patterns (MU index)', fontsize=14)
+    # ax.set_xlabel('Time (s)', fontsize=14)
+    # ax.xaxis.set_tick_params(labelsize=11)
+    # ax.yaxis.set_tick_params(labelsize=11)
 
-    ax2 = ax.twinx()
-    ax2.plot(times * fs, ext, linewidth=4, c='#003366', alpha=0.3)
-    ax2.tick_params(axis='y')
-    ax2.set_ylabel('Neural input', fontsize=14)
-    ax2.set_yticks([0, 1], labels=['0.0', '1.0'])
-    ax2.xaxis.set_tick_params(labelsize=11)
-    ax2.yaxis.set_tick_params(labelsize=11)
-    plt.tight_layout()
-    plt.savefig('./figs/spikes_ramp.svg')
-    plt.close()
+    # ax2 = ax.twinx()
+    # ax2.plot(times * fs, ext, linewidth=4, c='#003366', alpha=0.3)
+    # ax2.tick_params(axis='y')
+    # ax2.set_ylabel('Neural input', fontsize=14)
+    # ax2.set_yticks([0, 1], labels=['0.0', '1.0'])
+    # ax2.xaxis.set_tick_params(labelsize=11)
+    # ax2.yaxis.set_tick_params(labelsize=11)
+    # plt.tight_layout()
+    # plt.savefig('./figs/spikes_ramp.svg')
+    # plt.close()
 
-    # plot fr
-    cm = matplotlib.colormaps['bone']
-    my_colors = []
-    for i in np.linspace(0, 1, num_mu):
-        my_colors.append(cm(i))
+    # # plot fr
+    # cm = matplotlib.colormaps['bone']
+    # my_colors = []
+    # for i in np.linspace(0, 1, num_mu):
+    #     my_colors.append(cm(i))
 
-    fig = plt.figure()
-    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-    for i in range(0, num_mu, 5):
-        plt.plot(fr[i], color=(i / num_mu, 0.4, (num_mu - i) / num_mu))
-    ax.set_xticks(range(0, duration * fs + 1, 2*fs), labels=['0', '2', '4', '6'])
-    ax.set_ylabel('Firing Rate (Hz)')
-    ax.set_xlabel('Time (s)')
-    plt.savefig('./figs/fr_ramp.jpg')
-    plt.close()
+    # fig = plt.figure()
+    # ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    # for i in range(0, num_mu, 5):
+    #     plt.plot(fr[i], color=(i / num_mu, 0.4, (num_mu - i) / num_mu))
+    # ax.set_xticks(range(0, duration * fs + 1, 2*fs), labels=['0', '2', '4', '6'])
+    # ax.set_ylabel('Firing Rate (Hz)')
+    # ax.set_xlabel('Time (s)')
+    # plt.savefig('./figs/fr_ramp.jpg')
+    # plt.close()
 
-    mn_pool.display_onion_skin_theory(spikes, duration, fs, './figs/onion_skin_ramp.svg')
+    # mn_pool.display_onion_skin_theory(spikes, duration, fs, './figs/onion_skin_ramp.svg')
