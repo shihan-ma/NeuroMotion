@@ -1,9 +1,7 @@
-import matplotlib
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
-import time
 from easydict import EasyDict as edict
+import time
 
 import sys
 
@@ -82,6 +80,9 @@ class MotoneuronPoolStatus:
         }
 
         self._init_pool()
+
+        self.stream1 = torch.cuda.Stream()
+        self.stream2 = torch.cuda.Stream()
 
     def get_num_mu(self):
         return self.N
@@ -176,48 +177,82 @@ class MotoneuronPoolStatus:
         fr[E < self.rte] = 0
         return fr
 
+    # def generate_current_spikes(self, activation, fs, dt):
+    #     """
+    #     Args:
+    #         activation  excitation in percentage MVC, (1, 1)
+    #         dt        observation interval, e.g., 0.1s
+    #     Return:
+    #         spikes  binary array, (N, 1)
+
+    #     status of next firing will be updated as well
+    #     """
+
+    #     # check next spiking
+    #     current_spikes = (self.next_spiking <= 0).float()
+
+    #     # update fr
+    #     self.fr = self._calculate_fr(activation)  # current fr
+
+    #     # update next spiking
+    #     self.next_spiking[self.fr <= 0] = torch.iinfo(torch.int32).max
+
+    #     # calculate ipi for activated motor units
+    #     activated_mu = activation > self.rte
+    #     just_fired_or_activated = (self.next_spiking <= 0) | (
+    #         self.next_spiking == torch.iinfo(torch.int32).max
+    #     )
+    #     update_mask = activated_mu & just_fired_or_activated
+
+    #     ipi = 1 / dt / self.fr[update_mask]
+    #     ipi += torch.randn_like(ipi) * ipi * 1 / 6
+    #     self.next_spiking[update_mask] = ipi.floor()
+
+    #     # update next spiking for activated but not fired motor units
+    #     activated_not_fired = activated_mu & ~just_fired_or_activated
+    #     coeff = torch.ones_like(self.next_spiking[activated_not_fired])
+    #     self.next_spiking[activated_not_fired] = (
+    #         self.next_spiking[activated_not_fired] - 1 / (1 / fs) * dt * coeff
+    #     ).floor()
+
+    #     return current_spikes
+
     def generate_current_spikes(self, activation, fs, dt):
-        """
-        Args:
-            activation  excitation in percentage MVC, (1, 1)
-            dt        observation interval, e.g., 0.1s
-        Return:
-            spikes  binary array, (N, 1)
+        with torch.cuda.stream(self.stream1):
+            current_spikes = (self.next_spiking <= 0).float()
+            self.fr = self._calculate_fr(activation)
+            self.next_spiking[self.fr <= 0] = torch.iinfo(torch.int32).max
 
-        status of next firing will be updated as well
-        """
+        self.stream1.synchronize()
+        self.stream2.synchronize()
 
-        # check next spiking
-        current_spikes = (self.next_spiking <= 0).float()
+        with torch.cuda.stream(self.stream2):
+            activated_mu = activation > self.rte
+            just_fired_or_activated = (self.next_spiking <= 0) | (
+                self.next_spiking == torch.iinfo(torch.int32).max
+            )
+            update_mask = activated_mu & just_fired_or_activated
 
-        # update fr
-        self.fr = self._calculate_fr(activation)  # current fr
+        self.stream1.synchronize()
+        self.stream2.synchronize()
 
-        # update next spiking
-        self.next_spiking[self.fr <= 0] = torch.iinfo(torch.int32).max
+        with torch.cuda.stream(self.stream1):
+            ipi = 1 / dt / self.fr[update_mask]
+            ipi += torch.randn_like(ipi) * ipi * 1 / 6
+            self.next_spiking[update_mask] = ipi.floor()
 
-        # calculate ipi for activated motor units
+        self.stream1.synchronize()
+        self.stream2.synchronize()
 
-        activated_mu = activation > self.rte
-        just_fired_or_activated = (self.next_spiking <= 0) | (
-            self.next_spiking == torch.iinfo(torch.int32).max
-        )
-        update_mask = activated_mu & just_fired_or_activated
+        with torch.cuda.stream(self.stream2):
+            activated_not_fired = activated_mu & ~just_fired_or_activated
+            coeff = torch.ones_like(self.next_spiking[activated_not_fired])
+            self.next_spiking[activated_not_fired] = (
+                self.next_spiking[activated_not_fired] - 1 / (1 / fs) * dt * coeff
+            ).floor()
 
-        tic = time.time()
-        ipi = 1 / dt / self.fr[update_mask]
-        ipi += torch.randn_like(ipi) * ipi * 1 / 6
-        self.next_spiking[update_mask] = ipi.floor()
-        toc = time.time()
-
-        # update next spiking for activated but not fired motor units
-        activated_not_fired = activated_mu & ~just_fired_or_activated
-        coeff = torch.ones_like(self.next_spiking[activated_not_fired])
-        self.next_spiking[activated_not_fired] = (
-            self.next_spiking[activated_not_fired] - 1 / (1 / fs) * dt * coeff
-        ).floor()
-
-        print(toc - tic)
+        self.stream1.synchronize()
+        self.stream2.synchronize()
 
         return current_spikes
 

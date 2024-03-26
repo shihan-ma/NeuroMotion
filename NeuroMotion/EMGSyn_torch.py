@@ -80,7 +80,7 @@ class EMGSynthesiser:
         self._init_mn_pool(MNPool, mnpool_kwargs)
         self._init_muap_latent(mnpool_kwargs, biomime_cfg)
 
-        self.generator = generator.cuda() if device == "cuda" else device
+        self.generator = generator.cuda() if device.type == "cuda" else generator
         self.fs = fs
         self._fs = torch.tensor(fs, **self.dev_dtype)
         self._dt = self._fs.reciprocal()
@@ -119,11 +119,12 @@ class EMGSynthesiser:
 
     def update_emg(self, muscle_lengths, activations, dt=None):
 
+        tic = time.time()
         muaps = self.generate_muap(muscle_lengths)
-
         spikes = self.generate_spikes(activations, dt)
-
         emg = self.generate_emg(muaps, spikes)
+        toc = time.time()
+        print(toc - tic)
 
         if dt is None:
             dt = self._dt
@@ -224,7 +225,7 @@ if __name__ == "__main__":
         cfg,
         fs=fs,
         win_len=1,
-        device=args.device,
+        device=torch.device("cuda"),
     )
 
     ms_lengths = {

@@ -498,6 +498,8 @@ if __name__ == "__main__":
     ax2.xaxis.set_tick_params(labelsize=11)
     ax2.yaxis.set_tick_params(labelsize=11)
     plt.tight_layout()
+    plt.show()
+
     # plt.savefig("./figs/spikes_ramp.svg")
     # plt.close()
 
@@ -514,6 +516,7 @@ if __name__ == "__main__":
     ax.set_xticks(range(0, duration * fs + 1, 2 * fs), labels=["0", "2", "4", "6"])
     ax.set_ylabel("Firing Rate (Hz)")
     ax.set_xlabel("Time (s)")
+    plt.show()
 
     # mn_pool.display_onion_skin_theory(
     #     spikes, duration, fs, "./figs/onion_skin_ramp.svg"
